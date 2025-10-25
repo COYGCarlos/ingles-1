@@ -656,255 +656,138 @@
         
         // --- Variables de Estado Globales ---
         const NUM_QUESTIONS = 20;
-        let currentQuestions = []; // Las 20 preguntas seleccionadas al azar
-        let userAnswers = {}; // { questionId: 'respuestaSeleccionada', ... }
-        let currentQuestionIndex = 0;
-        let isQuizSubmitted = false;
-        
-        // --- Referencias DOM ---
-        const app = document.getElementById('app');
-        const quizArea = document.getElementById('quiz-area');
-        const resultsArea = document.getElementById('results-area');
-        const optionsContainer = document.getElementById('options-container');
-        const nextBtn = document.getElementById('next-btn');
-        const prevBtn = document.getElementById('prev-btn');
-        const submitQuizBtn = document.getElementById('submit-quiz-btn');
-        const restartBtn = document.getElementById('restart-btn');
+            let currentQuestions = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
 
-        // --- Funciones de Utilidad ---
+    const questionText = document.getElementById("question-text");
+    const optionsContainer = document.getElementById("options-container");
+    const questionCounter = document.getElementById("question-counter");
 
-        /**
-         * Selecciona 20 preguntas al azar del banco total.
-         */
-        function selectRandomQuestions() {
-            let shuffled = [...ALL_QUESTIONS];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
-            return shuffled.slice(0, NUM_QUESTIONS);
-        }
+    const nextBtn = document.getElementById("next-btn");
+    const prevBtn = document.getElementById("prev-btn");
+    const submitQuizBtn = document.getElementById("submit-quiz-btn");
+    const restartBtn = document.getElementById("restart-btn");
 
-        /**
-         * Calcula la nota final según la fórmula.
-         * 1 Correcta (A) = 1 punto. 1 Fallada (F) = -1/3 de punto.
-         * Puntaje Bruto (R) = A - F/3
-         * Nota (G) = max(0, 0.5 * R) (Escalado de 20 puntos máx a 10)
-         * @param {number} correctCount - Número de respuestas correctas.
-         * @param {number} failedCount - Número de respuestas falladas (incluye sin respuesta).
-         * @returns {string} Nota formateada.
-         */
-        function calculateScore(correctCount, failedCount) {
-            const rawScore = correctCount - (failedCount / 3);
-            const finalScore = Math.max(0, 0.5 * rawScore);
-            return finalScore.toFixed(2);
-        }
+    const resultsArea = document.getElementById("results-area");
+    const quizArea = document.getElementById("quiz-area");
 
-        // --- Funciones de Renderizado ---
+    const finalScore = document.getElementById("final-score");
+    const correctCount = document.getElementById("correct-count");
+    const failedCount = document.getElementById("failed-count");
+    const correctionList = document.getElementById("correction-list");
 
-        /**
-         * Inicializa y carga el quiz.
-         */
-        function loadQuiz() {
-            currentQuestions = selectRandomQuestions();
-            userAnswers = {};
-            currentQuestionIndex = 0;
-            isQuizSubmitted = false;
+    function shuffleArray(array) {
+        return array.sort(() => Math.random() - 0.5);
+    }
 
-            resultsArea.classList.add('hidden');
-            quizArea.classList.remove('hidden');
-            
-            // Ocultar botón de envío
-            nextBtn.classList.remove('hidden');
-            submitQuizBtn.classList.add('hidden');
-            
-            renderQuestion();
-        }
+    function loadQuiz() {
+        currentQuestions = shuffleArray([...ALL_QUESTIONS]).slice(0, 20);
+        currentQuestionIndex = 0;
+        score = 0;
+        quizArea.classList.remove("hidden");
+        resultsArea.classList.add("hidden");
+        renderQuestion();
+    }
 
-        /**
-         * Renderiza la pregunta actual en la interfaz.
-         */
-        function renderQuestion() {
-            const question = currentQuestions[currentQuestionIndex];
-            if (!question) return;
+    function renderQuestion() {
+        const currentQuestion = currentQuestions[currentQuestionIndex];
 
-            // Actualizar contador
-            document.getElementById('question-counter').textContent = `Pregunta ${currentQuestionIndex + 1} de ${currentQuestions.length}`;
+        questionText.textContent = currentQuestion.question;
+        questionCounter.textContent = `Pregunta ${currentQuestionIndex + 1} de ${currentQuestions.length}`;
 
-            // Insertar texto de la pregunta (reemplazando el marcador de posición)
-            const filledQuestion = question.question.replace(/\(.*\)/, '_____');
-            document.getElementById('question-text').textContent = filledQuestion;
+        optionsContainer.innerHTML = "";
+        document.querySelectorAll(".explanation").forEach(e => e.remove());
 
-            // Renderizar opciones
-            optionsContainer.innerHTML = '';
-            question.options.forEach(option => {
-                const button = document.createElement('button');
-                button.textContent = option;
-                button.value = option;
-                button.className = 'option-button px-4 py-3 rounded-xl font-medium text-lg text-gray-800 bg-white border border-gray-300 shadow-sm transition-all duration-150';
-                button.onclick = () => handleAnswer(option);
-                optionsContainer.appendChild(button);
-            });
+        shuffleArray(currentQuestion.options).forEach(option => {
+            const optionBtn = document.createElement("button");
+            optionBtn.className = "option-button bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-xl hover:bg-gray-300";
+            optionBtn.textContent = option;
 
-            // Aplicar estilos y habilitación/deshabilitación
-            applyAnswerState(question);
-        }
+            optionBtn.addEventListener("click", () => {
+                const isCorrect = option === currentQuestion.answer;
 
-        /**
-         * Aplica los estilos de respuesta (seleccionada, corregida).
-         */
-        function applyAnswerState(question) {
-            const userAnswer = userAnswers[question.id];
-            const buttons = optionsContainer.querySelectorAll('.option-button');
-            
-            prevBtn.disabled = currentQuestionIndex === 0 || isQuizSubmitted;
-            nextBtn.disabled = isQuizSubmitted;
-            
-            // Estado de navegación
-            if (currentQuestionIndex === currentQuestions.length - 1) {
-                nextBtn.classList.add('hidden');
-                submitQuizBtn.classList.remove('hidden');
-                submitQuizBtn.disabled = isQuizSubmitted;
-            } else {
-                nextBtn.classList.remove('hidden');
-                submitQuizBtn.classList.add('hidden');
-            }
+                document.querySelectorAll(".option-button").forEach(btn => {
+                    btn.disabled = true;
+                });
 
-            buttons.forEach(button => {
-                button.disabled = isQuizSubmitted;
-                button.classList.remove('bg-primary', 'text-white', 'bg-correct', 'bg-incorrect', 'border-correct', 'border-incorrect', 'text-white', 'hover:bg-gray-100', 'hover:border-primary');
-
-                if (isQuizSubmitted) {
-                    // Si ya se corrigió: mostrar correcto/incorrecto
-                    if (button.value === question.answer) {
-                        button.classList.add('bg-correct', 'text-white', 'border-correct');
-                    } else if (button.value === userAnswer) {
-                        button.classList.add('bg-incorrect', 'text-white', 'border-incorrect');
-                    } else {
-                        button.classList.add('opacity-50', 'bg-white', 'hover:bg-gray-100', 'hover:border-gray-300');
-                    }
-                } else if (button.value === userAnswer) {
-                    // Antes de corregir: solo mostrar selección
-                    button.classList.add('bg-primary', 'text-white');
-                    button.classList.remove('bg-white');
-                } else {
-                    // Sin seleccionar
-                    button.classList.add('bg-white', 'hover:bg-gray-100', 'hover:border-primary');
-                }
-            });
-        }
-
-        /**
-         * Maneja la selección de una respuesta (solo guarda la respuesta, sin feedback).
-         */
-        function handleAnswer(selectedOption) {
-            const question = currentQuestions[currentQuestionIndex];
-            userAnswers[question.id] = selectedOption;
-            
-            // Solo actualizar el estado visual de la selección
-            applyAnswerState(question);
-        }
-        
-        // --- Lógica del Quiz ---
-
-        /**
-         * Envía y corrige el test (Modo Practicar).
-         */
-        function submitQuiz() {
-            isQuizSubmitted = true;
-            let correctCount = 0;
-            let failedQuestions = [];
-            const correctionList = document.getElementById('correction-list');
-            correctionList.innerHTML = '';
-            
-            // 1. Recorrer y contar
-            currentQuestions.forEach((q, index) => {
-                const userAnswer = userAnswers[q.id];
-                const isCorrect = userAnswer && userAnswer === q.answer;
-                
                 if (isCorrect) {
-                    correctCount++;
+                    optionBtn.classList.add("bg-correct", "text-white");
+                    score++;
                 } else {
-                    failedQuestions.push({...q, userAnswer: userAnswer || 'Sin respuesta'});
+                    optionBtn.classList.add("bg-incorrect", "text-white");
+
+                    document.querySelectorAll(".option-button").forEach(btn => {
+                        if (btn.textContent === currentQuestion.answer) {
+                            btn.classList.add("bg-correct", "text-white");
+                        }
+                    });
                 }
-                
-                // 2. Renderizar la corrección detallada
-                const item = document.createElement('div');
-                const resultColor = isCorrect ? 'correct' : 'incorrect';
-                const resultBg = isCorrect ? 'bg-green-50' : 'bg-red-50';
 
-                item.className = `${resultBg} p-5 rounded-lg shadow-sm mb-4 border-l-4 border-${resultColor}`;
-                
-                // Texto de la pregunta
-                const filledQuestion = q.question.replace(/\(.*\)/, '_____');
-                item.innerHTML = `
-                    <p class="font-bold text-lg text-gray-800 mb-2">
-                        P. ${index + 1}: ${filledQuestion} <span class="text-${resultColor}">(${isCorrect ? 'Correcta' : 'Incorrecta'})</span>
-                    </p>
-                    <p class="text-sm text-gray-600 mb-1">
-                        Tu Respuesta: <span class="font-bold text-${isCorrect ? 'correct' : 'incorrect'}">${userAnswer || 'Sin respuesta'}</span>
-                    </p>
-                    <p class="text-sm text-gray-600 mb-3">
-                        Respuesta Correcta: <span class="font-bold text-correct">${q.answer}</span>
-                    </p>
-                `;
+                const explanationDiv = document.createElement("div");
+                explanationDiv.className = "explanation mt-4 p-4 bg-indigo-50 border-l-4 border-primary text-gray-800 rounded-md";
+                explanationDiv.innerHTML = `<strong>Explicación:</strong> ${currentQuestion.explanation}`;
+                document.getElementById("question-card").appendChild(explanationDiv);
 
-                // Añadir explicación si es incorrecta o sin respuesta
-                if (!isCorrect) {
-                    item.innerHTML += `
-                        <div class="mt-2 p-3 bg-white rounded-md border border-gray-200">
-                            <p class="text-sm font-semibold text-gray-800">Explicación (${q.tense}):</p>
-                            <p class="text-xs text-gray-700">${q.explanation}</p>
-                        </div>
-                    `;
-                }
-                correctionList.appendChild(item);
-            });
-            
-            // 3. Mostrar resumen y nota
-            const failedCount = NUM_QUESTIONS - correctCount;
-            
-            quizArea.classList.add('hidden');
-            resultsArea.classList.remove('hidden');
-            
-            document.getElementById('correct-count').textContent = correctCount;
-            document.getElementById('failed-count').textContent = failedCount;
-            
-            const finalScore = calculateScore(correctCount, failedCount);
-            document.getElementById('final-score').textContent = `${finalScore} / 10`;
+                nextBtn.disabled = false;
 
-            // Aplicar estilos a la última pregunta para que muestre la corrección
-            renderQuestion();
-        }
-
-        // --- Event Listeners ---
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Navegación
-            nextBtn.addEventListener('click', () => {
-                if (currentQuestionIndex < currentQuestions.length - 1) {
-                    currentQuestionIndex++;
-                    renderQuestion();
+                if (currentQuestionIndex === currentQuestions.length - 1) {
+                    submitQuizBtn.classList.remove("hidden");
+                    nextBtn.classList.add("hidden");
                 }
             });
 
-            prevBtn.addEventListener('click', () => {
-                if (currentQuestionIndex > 0) {
-                    currentQuestionIndex--;
-                    renderQuestion();
-                }
-            });
-
-            // Botón de Envío
-            submitQuizBtn.addEventListener('click', submitQuiz);
-
-            // Botón de Reinicio
-            restartBtn.addEventListener('click', loadQuiz);
-            
-            // Inicializar quiz al cargar la página
-            loadQuiz();
+            optionsContainer.appendChild(optionBtn);
         });
 
-    </script>
+        prevBtn.disabled = currentQuestionIndex === 0;
+        nextBtn.disabled = true;
+        submitQuizBtn.classList.add("hidden");
+        nextBtn.classList.remove("hidden");
+    }
+
+    function submitQuiz() {
+        quizArea.classList.add("hidden");
+        resultsArea.classList.remove("hidden");
+
+        const correct = score;
+        const failed = currentQuestions.length - correct;
+        finalScore.textContent = `${(correct / currentQuestions.length * 10).toFixed(2)} / 10`;
+        correctCount.textContent = correct;
+        failedCount.textContent = failed;
+
+        correctionList.innerHTML = currentQuestions.map((q, i) => {
+            const resultCorrect = q.answer === q.selected;
+            return `
+                <div class="mb-4 p-4 border rounded-lg ${resultCorrect ? 'bg-green-50 border-correct' : 'bg-red-50 border-incorrect'}">
+                    <p class="font-bold">${i + 1}. ${q.question}</p>
+                    <p>Tu respuesta: <strong>${q.selected || 'Sin respuesta'}</strong></p>
+                    <p>Respuesta correcta: <strong>${q.answer}</strong></p>
+                    <p class="mt-2 italic">${q.explanation}</p>
+                </div>
+            `;
+        }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        nextBtn.addEventListener('click', () => {
+            if (currentQuestionIndex < currentQuestions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+            }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+            }
+        });
+
+        submitQuizBtn.addEventListener('click', submitQuiz);
+        restartBtn.addEventListener('click', loadQuiz);
+        loadQuiz();
+    });
+</script>
 </body>
 </html>
